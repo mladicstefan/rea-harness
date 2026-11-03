@@ -4,8 +4,9 @@ A Docker container that runs the [Pi coding agent](https://github.com/earendil-w
 [REA](https://github.com/morluto/rea) (reverse-engineering MCP), the
 [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) on a shared headless
 Chromium, and [obra/superpowers](https://github.com/obra/superpowers) skills, against a **local LLM
-served from the host** (llama.cpp, vLLM, Ollama, LM Studio). Tuned so everything fits a **32k context
-window**.
+served from the host** by [ik_llama.cpp](https://github.com/ikawrakow/ik_llama.cpp) (any
+OpenAI-compatible `/v1` server works). Three model launch scripts under `models/` are selected by
+`models/start.sh`; context windows range from 32k to 256k depending on the model.
 
 ```
 host GPU ── llama-server / vLLM / Ollama  (0.0.0.0:8080)
@@ -21,28 +22,118 @@ host GPU ── llama-server / vLLM / Ollama  (0.0.0.0:8080)
 ## Quick start
 
 ```bash
-cp .env.example .env            # set LOCAL_LLM_MODEL and LOCAL_LLM_BASE_URL
+cp .env.example .env            # set LOCAL_LLM_BASE_URL (model fields are written by start.sh)
 docker compose build
-docker compose up -d
-./scripts/smoke.sh              # endpoint, chromium, MCP servers, rea doctor
-./scripts/attach.sh             # opens Pi's TUI (docker compose exec -it agent /docker/pi.sh)
+./models/start.sh               # pick a model, launch its host llama-server, sync .env, (re)create, attach
 ```
 
-The model server must listen on an address the container can reach, for example:
+`./scripts/smoke.sh` checks the endpoint, Chromium, MCP servers and `rea doctor` once the container is up.
+
+The model server runs on the **host** and must listen where the container can reach it
+(`host.docker.internal:8080`). `start.sh` launches it from the chosen `models/*.sh` script; to run one by
+hand, e.g.:
 
 ```bash
-llama-server -m model.gguf -c 32768 -ngl 99 --host 0.0.0.0 --port 8080 --jinja
+./models/qwen3-8-abliretrated.sh    # llama-server -m ... -c 32768 -ngl 999 --host 0.0.0.0 --port 8080
 ```
 
 `host.docker.internal` is mapped to the host gateway by compose (`extra_hosts`), so the default
 `LOCAL_LLM_BASE_URL=http://host.docker.internal:8080/v1` works on Linux, macOS and Windows.
 No container port is published; the Chromium DevTools port stays on the container's loopback.
 
-## Switching models
+## Models
 
-`./models/start.sh` lists the `models/*.sh` launch scripts, restarts `llama-server` with the one you pick,
-sets `LOCAL_LLM_MODEL`, `LOCAL_LLM_CONTEXT_WINDOW` and `PI_COMPACTION_KEEP_RECENT` in `.env`, recreates the
-container if those changed (ending any open Pi session), and attaches.
+`./models/start.sh` lists the `models/*.sh` launch scripts, restarts the host `llama-server` with the one
+you pick, writes `LOCAL_LLM_MODEL`, `LOCAL_LLM_CONTEXT_WINDOW` and `PI_COMPACTION_KEEP_RECENT` into `.env`
+to match, recreates the container (`docker compose up -d --wait`, ending any open Pi session), then
+attaches Pi.
+
+All measurements below are on a **Ryzen 7 3700X / RTX 4070 Ti SUPER 16GB / 48GB DDR4-3000**, Q4-class
+quant, KV cache `q8_0`.
+
+| Script | Model | Context | Placement | Notes |
+|---|---|---|---|---|
+| `models/qwen3-8-abliretrated.sh` | Qwen3.8-27B abliterated (dense) | 32k | GPU-only (`-ngl 999`) | ~28 tok/s generation. Needs nearly the whole 16GB card (~15.1GB used, ~200MB free) — this is why `-ub` was lowered to 512. |
+| `models/qwen3-5-9b-abliterated.sh` | Qwen3.5-9B abliterated (dense) | 256k | GPU-only | Fits entirely on GPU with headroom. Fast at normal context; slows at very long context (~16 tok/s near 380k in testing). An extended 384k YaRN variant was removed (unstable / quality regression). |
+| `models/qwen3-6-35b-a3b-abliterated.sh` | Qwen3.6-35B-A3B abliterated (MoE, 8 of 256 experts active) | 256k default (native; `CTX=` to change) | hybrid GPU+CPU via `-ncmoe` | Expert FFN tensors live in RAM; non-expert weights + KV on GPU. KV is cheap (2 KV heads): ~1.36GB at 128k, ~2.72GB at 256k. Tune placement with `NCMOE`, context with `CTX`. See sweep below. |
+
+### Qwen3.6-35B-A3B MoE placement sweep
+
+`-cmoe` keeps all experts in RAM (min VRAM, slowest); `-ncmoe N` keeps only the first `N` layers' experts
+on CPU (lower `N` = more experts on GPU = faster, less free VRAM). TG = generation tok/s, PP = prompt
+tok/s.
+
+**128k context**
+
+| Placement | TG | PP | VRAM used | VRAM free | |
+|---|---|---|---|---|---|
+| `-cmoe` | 54 | 344 | 4.1GB | 11.9GB | min VRAM baseline, slowest |
+| `-ncmoe 30` | 65 | 452 | 8.8GB | 7.2GB | |
+| `-ncmoe 26` | 63 | 530 | 10.7GB | 5.3GB | |
+| `-ncmoe 23` | 69 | 594 | 12.1GB | 4.0GB | **recommended** (script default) |
+| `-ncmoe 21` | 79 | 640 | 12.9GB | 3.1GB | aggressive, little headroom |
+
+**64k context**
+
+| Placement | TG | PP | VRAM used | VRAM free | |
+|---|---|---|---|---|---|
+| `-cmoe` | 53 | 349 | 3.5GB | 12.6GB | min VRAM baseline |
+| `-ncmoe 24` | 74 | 566 | 10.9GB | 5.1GB | |
+| `-ncmoe 20` | 75 | 667 | 12.7GB | 3.3GB | **recommended at 64k** |
+| `-ncmoe 17` | 85 | 774 | 14.1GB | 1.9GB | aggressive |
+| `-ncmoe 15` | 90 | 862 | 14.9GB | 1.1GB | aggressive, minimal headroom |
+
+The sweep above was measured at 128k and 64k. The script now defaults to **256k** (native context) with
+`-ncmoe 23`; since KV only grows ~1.36GB from 128k→256k, that config uses ~13.4GB / ~2.6GB free — derived
+from the 128k numbers, re-run the sweep to confirm on your card. Minimum-VRAM config is `-cmoe` (all
+experts in RAM); recommended is the default `-ncmoe 23`. Even the all-CPU baseline (~52–54 tok/s) is well
+above the ~20 tok/s seen on another engine. Override placement and context at launch, e.g.:
+
+```bash
+NCMOE=21            ./models/qwen3-6-35b-a3b-abliterated.sh   # faster, less headroom
+NCMOE=cmoe          ./models/qwen3-6-35b-a3b-abliterated.sh   # all experts on CPU
+CTX=131072 NCMOE=21 ./models/qwen3-6-35b-a3b-abliterated.sh   # smaller window, more experts on GPU
+```
+
+### Finding the best `-ncmoe` for your card
+
+`models/sweep-ncmoe.sh` automates the table above: it launches the model at a range of `-ncmoe` values
+(and context sizes), benchmarks generation/prompt speed, and records VRAM used/free for each, so you can
+pick the fastest placement that still fits. It drives the real launch script, so results match what you
+actually run.
+
+```bash
+# defaults: 256k context, ncmoe cmoe,30,26,23,21
+./models/sweep-ncmoe.sh models/qwen3-6-35b-a3b-abliterated.sh
+
+# custom contexts and placements
+./models/sweep-ncmoe.sh models/qwen3-6-35b-a3b-abliterated.sh --ctx 131072,65536 --ncmoe cmoe,30,23,21,17
+```
+
+Needs `curl`, `jq`, `nvidia-smi`, `python3`. It stops any running `llama-server` (it needs the GPU and
+port 8080 to itself) and leaves it stopped — start your model again with `./models/start.sh` afterward.
+A config that doesn't fit is reported as `FAILED/OOM` rather than crashing the sweep. Works with any MoE
+launch script that honors the `NCMOE` and `CTX` environment variables.
+
+### Pulling the models
+
+```bash
+hf download huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF Huihui-Qwen3.8-27B-abliterated-UD-IQ4_XS.gguf
+hf download mradermacher/Huihui-Qwen3.5-9B-abliterated-GGUF Huihui-Qwen3.5-9B-abliterated.Q4_K_M.gguf
+hf download wangzhang/Qwen3.6-35B-A3B-abliterated-GGUF Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf
+```
+
+### Codemode compatibility
+
+Pi's **codemode** reaches MCP tools (REA, chrome-devtools) only through JavaScript written inside a
+`codemode` tool call, controlled by `PI_MCP_EXPOSURE`. Not every model drives it well:
+
+- **Qwen3.8-27B** — drives codemode reliably; keep `PI_MCP_EXPOSURE=codemode`.
+- **Qwen3.5-9B** — struggles with codemode: it tries to run `codemode` / `tools.read` as shell commands and
+  loops. Workaround: `PI_MCP_EXPOSURE=deferred`, which exposes MCP tools as ordinary tool calls loaded on
+  demand via `tool_search`.
+- **Qwen3.6-35B-A3B** — drives tools well in **`deferred`** mode (discovers via `tool_search`, makes correct
+  MCP calls, recovers from schema errors). **Codemode itself is untested**; run it in `deferred` mode.
 
 ## Attaching
 
@@ -84,6 +175,8 @@ by `docker/render-config.sh`, which also overwrites `APPEND_SYSTEM.md` with the 
 | `PI_THINKING` | `off` | thinking level passed to `pi` by `attach.sh` |
 
 Changing `.env` and running `docker compose up -d` (recreate) applies the new values.
+
+`REA_MAX_RESPONSE_BYTES` must be ≥ `10485760` (10 MiB) or the REA MCP server refuses to start.
 
 ## Context budget
 

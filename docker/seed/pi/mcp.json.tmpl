@@ -6,6 +6,9 @@
       "args": ["mcp"],
       "exposure": "${PI_MCP_EXPOSURE}",
       "description": "REA reverse engineering: JS/Electron bundles and web apps, live browser pages over CDP, packet captures, native/managed binaries, evidence ledger. Browser tools take a cdp_endpoint and need no open step; use open_binary only for files on disk.",
+      "toolExposure": {
+        "list_browser_targets": "direct"
+      },
       "env": {
         "REA_MCP_TOOL_FAMILIES": "${REA_TOOL_FAMILIES}",
         "REA_MCP_INPUT_SCHEMA_PROFILE": "${REA_INPUT_SCHEMA_PROFILE}",

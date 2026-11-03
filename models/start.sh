@@ -25,7 +25,10 @@ done
 [ -n "$script" ] || exit 1
 
 alias="$(flag "$script" --alias)"
-ctx="$(flag "$script" -c)"
+# Context: scripts with a `CTX="${CTX:-N}"` default expose it there; dense
+# scripts just hardcode `-c N`.
+ctx="$(sed -nE 's/^CTX="\$\{CTX:-([0-9]+)\}".*/\1/p' "$script" | head -1)"
+[ -n "$ctx" ] || ctx="$(flag "$script" -c)"
 gguf="$(flag "$script" -m)"
 # Skip the precheck when -m is a shell variable (the script resolves the path
 # itself, e.g. from a glob); the launch script does its own existence check.
