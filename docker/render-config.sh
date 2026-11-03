@@ -25,7 +25,7 @@ TMPL_DIR="${TMPL_DIR:-/docker/seed/pi}"
 : "${REA_TOOL_FAMILIES:=browser,electron,application,javascript-runtime,session}"
 : "${REA_INPUT_SCHEMA_PROFILE:=compact}"
 : "${REA_OUTPUT_SCHEMA_PROFILE:=off}"
-: "${REA_MAX_RESPONSE_BYTES:=65536}"
+: "${REA_MAX_RESPONSE_BYTES:=10485760}"
 : "${REA_LOG_LEVEL:=info}"
 : "${CHROME_SLIM:=0}"
 : "${CDP_PORT:=9222}"
@@ -88,5 +88,8 @@ if [ -f "$AGENT_DIR/mcp.local.json" ]; then
 else
   render "$TMPL_DIR/mcp.json.tmpl" "$AGENT_DIR/mcp.json" "$mcp_filter"
 fi
+
+# --- APPEND_SYSTEM.md ------------------------------------------------------
+cp "$TMPL_DIR/APPEND_SYSTEM.md" "$AGENT_DIR/APPEND_SYSTEM.md"
 
 echo "[render-config] mode=$LLM_MODE model=$LOCAL_LLM_MODEL endpoint=$LOCAL_LLM_BASE_URL ctx=$LOCAL_LLM_CONTEXT_WINDOW mcp-exposure=$PI_MCP_EXPOSURE codemode=$PI_CODEMODE_MODE"

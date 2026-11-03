@@ -38,6 +38,12 @@ llama-server -m model.gguf -c 32768 -ngl 99 --host 0.0.0.0 --port 8080 --jinja
 `LOCAL_LLM_BASE_URL=http://host.docker.internal:8080/v1` works on Linux, macOS and Windows.
 No container port is published; the Chromium DevTools port stays on the container's loopback.
 
+## Switching models
+
+`./models/start.sh` lists the `models/*.sh` launch scripts, restarts `llama-server` with the one you pick,
+sets `LOCAL_LLM_MODEL`, `LOCAL_LLM_CONTEXT_WINDOW` and `PI_COMPACTION_KEEP_RECENT` in `.env`, recreates the
+container if those changed (ending any open Pi session), and attaches.
+
 ## Attaching
 
 - `./scripts/attach.sh [pi args]` starts Pi in `/workspace` (`--continue`, `-p "prompt"`, ... pass through).
@@ -57,7 +63,7 @@ Put projects under `./workspace` on the host (`WORKSPACE` in `.env`). Files are 
 | `/data/rea` | REA evidence / Ghidra projects |
 
 `settings.json`, `models.json` and `mcp.json` are **re-rendered from the environment on every boot**
-by `docker/render-config.sh`. To keep manual overrides, put them in `/data/pi/settings.local.json` or
+by `docker/render-config.sh`, which also overwrites `APPEND_SYSTEM.md` with the copy from the image. To keep manual overrides, put them in `/data/pi/settings.local.json` or
 `/data/pi/mcp.local.json`; they are deep-merged on top of the rendered files.
 
 ## Configuration (`.env`)

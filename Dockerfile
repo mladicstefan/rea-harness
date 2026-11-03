@@ -17,11 +17,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # procps: REA's process supervisor needs a procps-compatible `ps` on Linux.
 # gettext-base: envsubst for config rendering. chromium: shared headless browser.
+# ripgrep, fd-find: Pi's search tools; PI_OFFLINE stops it downloading its own.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates curl git gnupg procps jq gettext-base tmux less \
-      xz-utils unzip python3 \
+      xz-utils unzip python3 ripgrep fd-find \
       chromium fonts-liberation fonts-noto-color-emoji \
+ && ln -s /usr/bin/fdfind /usr/local/bin/fd \
  && rm -rf /var/lib/apt/lists/*
 
 # Node from the official tarball (Debian's nodejs is too old for rea-agents,

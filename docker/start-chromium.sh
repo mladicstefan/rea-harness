@@ -8,6 +8,9 @@ CDP_PORT="${CDP_PORT:-9222}"
 PROFILE_DIR="${CHROMIUM_PROFILE_DIR:-/data/chromium}"
 mkdir -p "$PROFILE_DIR"
 while true; do
+  # Locks on the volume name the previous container's hostname, which makes
+  # Chromium refuse the profile after a recreate. Nothing else uses it here.
+  rm -f "$PROFILE_DIR"/Singleton{Lock,Cookie,Socket}
   chromium \
     --headless \
     --no-sandbox \
