@@ -1,0 +1,42 @@
+services:
+  agent:
+    build:
+      context: .
+    image: rea-harness:local
+    container_name: rea-harness
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PI_CODING_AGENT_DIR: /data/pi
+      TERM: xterm-256color
+      COLORTERM: truecolor
+    volumes:
+      - harness-data:/data
+      - ${WORKSPACE:-./workspace}:/workspace
+    working_dir: /workspace
+    # Reach the host's model server from the NAT bridge network.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - harness
+    stdin_open: true
+    tty: true
+    init: true
+    shm_size: "1gb"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${CDP_PORT:-9222}/json/version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  harness:
+    driver: bridge
+
+volumes:
+  harness-data:

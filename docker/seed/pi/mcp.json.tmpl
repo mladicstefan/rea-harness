@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "rea": {
+      "type": "stdio",
+      "command": "/usr/local/bin/rea",
+      "args": ["mcp"],
+      "exposure": "${PI_MCP_EXPOSURE}",
+      "description": "REA reverse engineering: JS/Electron bundles and web apps, live browser pages over CDP, packet captures, native/managed binaries, evidence ledger. Open a target with open_binary first.",
+      "env": {
+        "REA_MCP_TOOL_FAMILIES": "${REA_TOOL_FAMILIES}",
+        "REA_MCP_INPUT_SCHEMA_PROFILE": "${REA_INPUT_SCHEMA_PROFILE}",
+        "REA_MCP_OUTPUT_SCHEMA_PROFILE": "${REA_OUTPUT_SCHEMA_PROFILE}",
+        "REA_MCP_MAX_RESPONSE_BYTES": "${REA_MAX_RESPONSE_BYTES}",
+        "REA_LOG_LEVEL": "${REA_LOG_LEVEL}",
+        "REA_GHIDRA_PROJECT_PATH": "/data/rea/ghidra",
+        "HOME": "/home/agent"
+      }
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "/usr/local/bin/chrome-devtools-mcp",
+      "args": ["--browserUrl", "http://127.0.0.1:${CDP_PORT}"],
+      "exposure": "${PI_MCP_EXPOSURE}",
+      "description": "Headless Chromium shared with REA (CDP on 127.0.0.1:${CDP_PORT}): navigate, click, fill, evaluate JS, screenshots, console, network, performance."
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "defaultProvider": "local",
+  "defaultModel": "${LOCAL_LLM_MODEL}",
+  "defaultTools": ["read", "bash", "edit", "write"],
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": ${PI_COMPACTION_RESERVE},
+    "keepRecentTokens": ${PI_COMPACTION_KEEP_RECENT}
+  },
+  "codemode": {
+    "mode": "${PI_CODEMODE_MODE}",
+    "inlineBudget": ${PI_CODEMODE_INLINE_BUDGET}
+  },
+  "packages": ["git:github.com/obra/superpowers@${SUPERPOWERS_REF}"],
+  "skills": ["/data/home/.agents/skills"],
+  "sessionDir": "/data/pi/sessions"
+}

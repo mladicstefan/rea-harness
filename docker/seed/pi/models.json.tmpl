@@ -1,0 +1,27 @@
+{
+  "$schema": "https://pi.dev/schemas/models.schema.json",
+  "providers": {
+    "local": {
+      "name": "Local (${LOCAL_LLM_BASE_URL})",
+      "baseUrl": "${LOCAL_LLM_BASE_URL}",
+      "api": "openai-completions",
+      "apiKey": "${LOCAL_LLM_API_KEY}",
+      "models": [
+        {
+          "id": "${LOCAL_LLM_MODEL}",
+          "name": "${LOCAL_LLM_MODEL}",
+          "contextWindow": ${LOCAL_LLM_CONTEXT_WINDOW},
+          "maxTokens": ${LOCAL_LLM_MAX_TOKENS},
+          "reasoning": ${LOCAL_LLM_REASONING},
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "compat": {
+            "maxTokensField": "${LOCAL_LLM_MAX_TOKENS_FIELD}",
+            "thinkingFormat": "${LOCAL_LLM_THINKING_FORMAT}",
+            "supportsStore": false,
+            "supportsDeveloperRole": false
+          }
+        }
+      ]
+    }
+  }
+}
