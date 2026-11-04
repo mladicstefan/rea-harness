@@ -43,7 +43,8 @@ No container port is published; the Chromium DevTools port stays on the containe
 
 ## Models
 
-`./models/start.sh` lists the `models/*.sh` launch scripts, restarts the host `llama-server` with the one
+`./models/start.sh` lists the `models/*.sh` launch scripts with their context and inference engine
+(ik_llama.cpp `llama-server` or [Strata](https://github.com/Niko1221/Strata)), restarts the host server with the one
 you pick, writes `LOCAL_LLM_MODEL`, `LOCAL_LLM_CONTEXT_WINDOW` and `PI_COMPACTION_KEEP_RECENT` into `.env`
 to match, recreates the container (`docker compose up -d --wait`, ending any open Pi session), then
 attaches Pi.
@@ -57,6 +58,7 @@ quant, KV cache `q8_0`.
 | `models/qwen3-5-9b-abliterated.sh` | Qwen3.5-9B abliterated (dense) | 256k | GPU-only | Fits entirely on GPU with headroom. Fast at normal context; slows at very long context (~16 tok/s near 380k in testing). An extended 384k YaRN variant was removed (unstable / quality regression). |
 | `models/qwen3-6-35b-a3b-abliterated.sh` | Qwen3.6-35B-A3B abliterated (MoE, 8 of 256 experts active) | 256k default (native; `CTX=` to change) | hybrid GPU+CPU via `-ncmoe` | Expert FFN tensors live in RAM; non-expert weights + KV on GPU. KV is cheap (2 KV heads): ~1.36GB at 128k, ~2.72GB at 256k. Tune placement with `NCMOE`, context with `CTX`. See sweep below. |
 | `models/qwen3-8-27b-turbo-fable-cold-fusion-735-882-heretic-uncensored-neo-coder-max-mtp.sh` | DavidAU Qwen3.8-27B TURBO Fable-Cold-Fusion (dense, Heretic/uncensored) | 64k | GPU-only, MTP self-speculation | IQ2_M (~12GB weights). Uses the model's NextN/MTP head via `--spec-type mtp`; card default reasoning (`xhigh`, `preserve_thinking` on). **128k OOMs on 16GB** with q8_0 KV (weights 11GB + 4.8GB KV); use `-ctk q4_0 -ctv q4_0` or lower `-c`. Keep temp ≤1, rep pen off or MTP acceptance drops. |
+| `models/qwen3-8-flash-next-abliterated-uncensored-turbo-brilliance-50x-reasoning-instruct-gsq-rco.sh` | DavidAU Qwen3.8-Flash-Next Abliterated/Uncensored Turbo-Brilliance GSQ-RCO (MoE, 125B) | 128k (`CTX=` to change) | **Strata** engine: hot experts on GPU, all experts mmap'd from RAM/SSD, MTP draft | IQ3_S (~78GB, 2 shards). Not llama.cpp: the script derives `Strata/strata-iq3_s.128k.json` from the config Strata's setup wrote (`strata-iq3_s.json`, 64k) and runs `serve/server.py` on 0.0.0.0:8080. KV is ~13 KB/token (GDN + sparse attention), so 128k costs ~1.7GB VRAM, ~0.85GB more than Strata's 64k default, taken from the auto-sized expert cache (~10% fewer slots). Sampling defaults are the DavidAU card's (temp 1.0, top_p 0.95, top_k 64 = Strata's cap, min_p 0.05, no repeat penalty); without a `sampling` block Strata decodes greedy for clients that send none, like Pi. Needs a finished `./setup.sh` in `~/code/Strata` first. |
 
 ### Qwen3.6-35B-A3B MoE placement sweep
 
@@ -123,6 +125,9 @@ hf download huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF Huihui-Qwen3.8-27B-abl
 hf download mradermacher/Huihui-Qwen3.5-9B-abliterated-GGUF Huihui-Qwen3.5-9B-abliterated.Q4_K_M.gguf
 hf download wangzhang/Qwen3.6-35B-A3B-abliterated-GGUF Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf
 hf download DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-MTP-IQ2_M.gguf
+# Strata model: 2 shards into ~/code/models, then prepare the pack once with Strata's setup
+hf download DavidAU/Qwen3.8-Flash-Next-Abliterated-Uncensored-Turbo-Brilliance-50x-Reasoning-Instruct-GSQ-RCO-GGUF --include 'Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_S/*' --local-dir ~/code/models
+(cd ~/code/Strata && ./setup.sh --setup --model IQ3_S --gguf-dir ~/code/models --no-start)
 ```
 
 ### Codemode compatibility
