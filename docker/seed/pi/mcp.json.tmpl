@@ -25,6 +25,13 @@
       "args": ["--browserUrl", "http://127.0.0.1:${CDP_PORT}"],
       "exposure": "${PI_MCP_EXPOSURE}",
       "description": "Headless Chromium shared with REA (CDP on 127.0.0.1:${CDP_PORT}): navigate, click, fill, evaluate JS, screenshots, console, network, performance."
+    },
+    "ddg": {
+      "type": "stdio",
+      "command": "/opt/ddg/bin/duckduckgo-mcp-server",
+      "args": [],
+      "exposure": "${PI_MCP_EXPOSURE}",
+      "description": "DuckDuckGo web search (no API key). search returns compact ranked results; fetch_content returns a page as markdown to keep tokens low."
     }
   }
 }

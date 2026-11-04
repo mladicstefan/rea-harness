@@ -11,6 +11,9 @@ ARG REA_VERSION=6.8.0
 ARG CHROME_DEVTOOLS_MCP_VERSION=1.12.0
 # obra/superpowers v7.0.1
 ARG SUPERPOWERS_REF=2ce8aa15d05bd57213e6f746f953aafb7ded7a8b
+# nickclyde/duckduckgo-mcp-server: DuckDuckGo search + markdown page fetch, no API
+# key. Empty = latest; pin with --build-arg DDG_MCP_VERSION=x.y.z.
+ARG DDG_MCP_VERSION=
 ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -21,7 +24,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates curl git gnupg procps jq gettext-base tmux less \
-      xz-utils unzip python3 ripgrep fd-find \
+      xz-utils unzip python3 python3-venv ripgrep fd-find \
       chromium fonts-liberation fonts-noto-color-emoji \
  && ln -s /usr/bin/fdfind /usr/local/bin/fd \
  && rm -rf /var/lib/apt/lists/*
@@ -45,6 +48,12 @@ RUN npm install -g --ignore-scripts --no-audit --no-fund \
       "chrome-devtools-mcp@${CHROME_DEVTOOLS_MCP_VERSION}" \
  && npm cache clean --force \
  && pi --version && rea --version && chrome-devtools-mcp --version
+
+# DuckDuckGo web search MCP (no API key) in its own venv so it stays offline-ready
+# and isolated from the system Python.
+RUN python3 -m venv /opt/ddg \
+ && /opt/ddg/bin/pip install --no-cache-dir "duckduckgo-mcp-server${DDG_MCP_VERSION:+==${DDG_MCP_VERSION}}" \
+ && test -x /opt/ddg/bin/duckduckgo-mcp-server
 
 RUN useradd -m -u 1000 -s /bin/bash agent \
  && mkdir -p /data /workspace /opt/seed \

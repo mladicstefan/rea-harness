@@ -9,12 +9,15 @@ HEALTH=http://127.0.0.1:8080
 
 flag() { sed -nE "s/.*[[:space:]]$2[[:space:]]+([^[:space:]]+).*/\1/p" "$1" | head -1; }
 set_env() { sed -i -E "s|^$1=.*|$1=$2|" .env; }
+# Context: scripts with a `CTX="${CTX:-N}"` default expose it there; dense
+# scripts just hardcode `-c N`.
+ctx_of() { local c; c="$(sed -nE 's/^CTX="\$\{CTX:-([0-9]+)\}".*/\1/p' "$1" | head -1)"; [ -n "$c" ] || c="$(flag "$1" -c)"; echo "$c"; }
 
 scripts=(); labels=()
 for f in models/*.sh; do
-  [ "$f" = models/start.sh ] && continue
+  case "$f" in models/start.sh|models/sweep-ncmoe.sh) continue ;; esac
   scripts+=("$f")
-  labels+=("$(flag "$f" --alias) ($(( $(flag "$f" -c) / 1024 ))k context)")
+  labels+=("$(flag "$f" --alias) ($(( $(ctx_of "$f") / 1024 ))k context)")
 done
 
 PS3="Model: "
@@ -25,10 +28,7 @@ done
 [ -n "$script" ] || exit 1
 
 alias="$(flag "$script" --alias)"
-# Context: scripts with a `CTX="${CTX:-N}"` default expose it there; dense
-# scripts just hardcode `-c N`.
-ctx="$(sed -nE 's/^CTX="\$\{CTX:-([0-9]+)\}".*/\1/p' "$script" | head -1)"
-[ -n "$ctx" ] || ctx="$(flag "$script" -c)"
+ctx="$(ctx_of "$script")"
 gguf="$(flag "$script" -m)"
 # Skip the precheck when -m is a shell variable (the script resolves the path
 # itself, e.g. from a glob); the launch script does its own existence check.

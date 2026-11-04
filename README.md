@@ -56,6 +56,7 @@ quant, KV cache `q8_0`.
 | `models/qwen3-8-abliretrated.sh` | Qwen3.8-27B abliterated (dense) | 32k | GPU-only (`-ngl 999`) | ~28 tok/s generation. Needs nearly the whole 16GB card (~15.1GB used, ~200MB free) — this is why `-ub` was lowered to 512. |
 | `models/qwen3-5-9b-abliterated.sh` | Qwen3.5-9B abliterated (dense) | 256k | GPU-only | Fits entirely on GPU with headroom. Fast at normal context; slows at very long context (~16 tok/s near 380k in testing). An extended 384k YaRN variant was removed (unstable / quality regression). |
 | `models/qwen3-6-35b-a3b-abliterated.sh` | Qwen3.6-35B-A3B abliterated (MoE, 8 of 256 experts active) | 256k default (native; `CTX=` to change) | hybrid GPU+CPU via `-ncmoe` | Expert FFN tensors live in RAM; non-expert weights + KV on GPU. KV is cheap (2 KV heads): ~1.36GB at 128k, ~2.72GB at 256k. Tune placement with `NCMOE`, context with `CTX`. See sweep below. |
+| `models/qwen3-8-27b-turbo-fable-cold-fusion-735-882-heretic-uncensored-neo-coder-max-mtp.sh` | DavidAU Qwen3.8-27B TURBO Fable-Cold-Fusion (dense, Heretic/uncensored) | 64k | GPU-only, MTP self-speculation | IQ2_M (~12GB weights). Uses the model's NextN/MTP head via `--spec-type mtp`; card default reasoning (`xhigh`, `preserve_thinking` on). **128k OOMs on 16GB** with q8_0 KV (weights 11GB + 4.8GB KV); use `-ctk q4_0 -ctv q4_0` or lower `-c`. Keep temp ≤1, rep pen off or MTP acceptance drops. |
 
 ### Qwen3.6-35B-A3B MoE placement sweep
 
@@ -121,6 +122,7 @@ launch script that honors the `NCMOE` and `CTX` environment variables.
 hf download huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF Huihui-Qwen3.8-27B-abliterated-UD-IQ4_XS.gguf
 hf download mradermacher/Huihui-Qwen3.5-9B-abliterated-GGUF Huihui-Qwen3.5-9B-abliterated.Q4_K_M.gguf
 hf download wangzhang/Qwen3.6-35B-A3B-abliterated-GGUF Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf
+hf download DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-MTP-IQ2_M.gguf
 ```
 
 ### Codemode compatibility
